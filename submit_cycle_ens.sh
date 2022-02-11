@@ -14,8 +14,8 @@ exp_name=open_testing
 open_loop=True # If "False" do DA.
 
 # set your directories
-export WORKDIR=/scratch2/BMC/gsienkf/Clara.Draper/workdir/ # temporary work dir
-export OUTDIR=/scratch2/BMC/gsienkf/Clara.Draper/gerrit-hera/AZworkflow/${exp_name}/output/
+export WORKDIR=/scratch1/NCEPDEV/stmp4/Zhichang.Guo/Work/TestcycleDA/experiment1/workdir/ # temporary work dir
+export OUTDIR=/scratch1/NCEPDEV/stmp4/Zhichang.Guo/Work/TestcycleDA/experiment1/${exp_name}/output/
 
 dates_per_job=20
 
@@ -29,14 +29,14 @@ SAVEDIR=${OUTDIR}/restarts # dir to save restarts
 MODLDIR=${OUTDIR}/noahmp # dir to save noah-mp output
 # create output dircetories
 mkdir -p ${OUTDIR}/DA
-mkdir ${OUTDIR}/DA/IMSproc 
-mkdir ${OUTDIR}/DA/jedi_incr
-mkdir ${OUTDIR}/DA/logs
-mkdir ${OUTDIR}/DA/hofx
-mkdir ${OUTDIR}/restarts
-mkdir ${OUTDIR}/restarts/vector
-mkdir ${OUTDIR}/restarts/tile
-mkdir ${OUTDIR}/noahmp
+mkdir -p ${OUTDIR}/DA/IMSproc 
+mkdir -p ${OUTDIR}/DA/jedi_incr
+mkdir -p ${OUTDIR}/DA/logs
+mkdir -p ${OUTDIR}/DA/hofx
+mkdir -p ${OUTDIR}/restarts
+mkdir -p ${OUTDIR}/restarts/vector
+mkdir -p ${OUTDIR}/restarts/tile
+mkdir -p ${OUTDIR}/noahmp
 
 source cycle_mods_bash
 
@@ -44,7 +44,8 @@ source cycle_mods_bash
 
 CYCLEDIR=$(pwd)  # this directory
 vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
-LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
+#LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
+LSMexec=/scratch2/NCEPDEV/stmp3/Zhichang.Guo/EMCLandPreP7/ufs-land-driver/run/ufsLand.exe
 DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
 export DADIR=${CYCLEDIR}/landDA_workflow/
 
