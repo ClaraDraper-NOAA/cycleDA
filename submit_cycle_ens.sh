@@ -24,16 +24,16 @@ exp_name=open_testing
 # specify DA and Ensemble options (all should be "YES" or "NO") 
 ################################################################
 
-export do_DA=NO   # do full DA update
-do_hofx=NO  # use JEDI to calculate hofx, but do not do update 
+export do_DA=YES   # do full DA update
+do_hofx=YES  # use JEDI to calculate hofx, but do not do update 
             # only used if do_DA=NO  
-do_ens=YES # If "YES"  do ensemble run
+export do_ens=YES # If "YES"  do ensemble run
 
 # DA options (select "YES" to assimilate or calcualte hofx) 
 DAtype="letkfoi_snow" # for snow, use "letkfoi_snow" 
-export ASSIM_IMS=YES
-export ASSIM_GHCN=YES
-export ASSIM_SYNTH=NO
+export ASSIM_IMS=NO
+export ASSIM_GHCN=NO
+export ASSIM_SYNTH=YES
 if [[ $do_DA == "YES" || $do_hofx == "YES" ]]; then  # do DA
    do_jedi=YES
    # construct yaml name
@@ -43,9 +43,12 @@ if [[ $do_DA == "YES" || $do_hofx == "YES" ]]; then  # do DA
         JEDI_YAML=${DAtype}"_offline_hofx"
    fi
 
-   if  [ ASSIM_IMS=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_IMS" ; fi
-   if  [ ASSIM_GHCN=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_GHCN" ; fi
-
+   if  [ ASSIM_SYNTH=="YES" ]; then
+       JEDI_YAML=letkf_snow_offline_synthetic_snowdepth
+   else
+       if  [ ASSIM_IMS=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_IMS" ; fi
+       if  [ ASSIM_GHCN=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_GHCN" ; fi
+   fi
    JEDI_YAML=${JEDI_YAML}"_C96.yaml" # IMS and GHCN
 
    echo "JEDI YAML is: "$JEDI_YAML
@@ -62,6 +65,9 @@ fi
 # set your directories
 export WORKDIR=/scratch1/NCEPDEV/stmp4/Zhichang.Guo/Work/TestcycleDA/experiment1/workdir/ # temporary work dir
 export OUTDIR=/scratch1/NCEPDEV/stmp4/Zhichang.Guo/Work/TestcycleDA/experiment1/${exp_name}/output/
+#export RSTDIR=/scratch1/NCEPDEV/da/Azadeh.Gholoubi/jedi_experiment1/cycleDA/output/restarts/vector/
+#export RSTDIR=/scratch2/BMC/gsienkf/Clara.Draper/gerrit-hera/AZworkflow/
+export RSTDIR=/scratch2/NCEPDEV/stmp3/Zhichang.Guo/GEFS/exps/
 
 dates_per_job=2
 
@@ -106,7 +112,7 @@ source cycle_mods_bash
 
 CYCLEDIR=$(pwd)  # this directory
 #vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
-vec2tileexec=/scratch2/BMC/gsienkf/Clara.Draper/gerrit-hera/AZworkflow/vector2tile/vector2tile_converter.exe
+vec2tileexec=/scratch1/NCEPDEV/stmp4/Zhichang.Guo/Work/Test/jedi/cycleDA/vector2tile/vector2tile_converter.exe
 #LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
 LSMexec=/scratch2/NCEPDEV/stmp3/Zhichang.Guo/EMCLandPreP7/ufs-land-driver/run/ufsLand.exe
 DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
@@ -134,17 +140,22 @@ sHH=`echo $STARTDATE | cut -c9-10`
 if [ $do_ens == "YES" ]; then
     for ens_member in "${ens_list[@]}"
     do
-        source_restart=/scratch2/NCEPDEV/stmp3/Zhichang.Guo/GEFS/exps/ufs_land_restart.ens${ens_member}.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
+        source_restart=${RSTDIR}/ufs_land_restart.ens${ens_member}.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
         target_restart=${SAVEDIR}/vector/ufs_land_restart.ens${ens_member}_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
         if [[ ! -e ${target_restart} ]]; then
             cp ${source_restart} ${target_restart}
         fi
     done
 else
-    if [[ ! -e ${OUTDIR}/restarts/vector/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc ]]; then
-
-    cp ./ufs_land_restart.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc ${OUTDIR}/restarts/vector/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
-
+    target_restart=${SAVEDIR}/vector/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
+    source_restart=${RSTDIR}/ufs_land_restart.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
+    if [[ ! -e ${target_restart} ]]; then
+        if [[ -e ${source_restart} ]]; then
+            cp ${source_restart} ${target_restart}
+        else
+            source_restart=${RSTDIR}/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
+            cp ${source_restart} ${target_restart}
+        fi
     fi
 fi
 
@@ -202,14 +213,10 @@ while [ $date_count -lt $dates_per_job ]; do
         if [ $do_ens == "YES" ]; then
             ens_member=${ens_list[$ensemble_count]}
             ENSEMBLE_DIR=${WORKDIR}/ens${ens_member}
-            restart_anal_id=.ens${ens_member}_anal
             restart_back_id=.ens${ens_member}_back
-            namelist_file=${CYCLEDIR}/template.ens.ufs-noahMP.namelist.gswp3
         else
             ENSEMBLE_DIR=${WORKDIR}
-            restart_anal_id='_anal'
             restart_back_id='_back'
-            namelist_file=${CYCLEDIR}/template.ufs-noahMP.namelist.gswp3
         fi
 
         cd ${ENSEMBLE_DIR}
@@ -218,6 +225,91 @@ while [ $date_count -lt $dates_per_job ]; do
         src_restart=${SAVEDIR}/vector/ufs_land_restart${restart_back_id}.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
         cp ${src_restart} ${ENSEMBLE_DIR}/restarts/vector/ufs_land_restart.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
 
+        if [ $do_jedi == "YES" ]; then
+
+            # update vec2tile and tile2vec namelists
+            cp  ${CYCLEDIR}/template.vector2tile vector2tile.namelist
+
+            sed -i -e "s/XXYYYY/${YYYY}/g" vector2tile.namelist
+            sed -i -e "s/XXMM/${MM}/g" vector2tile.namelist
+            sed -i -e "s/XXDD/${DD}/g" vector2tile.namelist
+            sed -i -e "s/XXHH/${HH}/g" vector2tile.namelist
+
+            # submit vec2tile 
+            echo '************************************************'
+            echo 'calling vector2tile' 
+            $vec2tileexec vector2tile.namelist
+            if [[ $? != 0 ]]; then
+                echo "vec2tile failed"
+                exit 
+            fi
+
+            # add coupler.res file
+            cres_file=${ENSEMBLE_DIR}/restarts/tile/${YYYY}${MM}${DD}.${HH}0000.coupler.res
+            cp  ${CYCLEDIR}/template.coupler.res $cres_file
+
+            sed -i -e "s/XXYYYY/${YYYY}/g" $cres_file
+            sed -i -e "s/XXMM/${MM}/g" $cres_file
+            sed -i -e "s/XXDD/${DD}/g" $cres_file
+
+        fi
+    done
+    wait
+
+    if [ $do_jedi == "YES" ]; then  # do DA
+        # submit snow DA 
+        echo '************************************************'
+        echo 'calling snow DA'
+        export THISDATE
+#       $DAscript
+        if [[ $? != 0 ]]; then
+            echo "land DA script failed"
+            exit
+        fi
+    fi
+
+    # for each ensemble member
+    for (( ensemble_count=0; ensemble_count<ensemble_size; ensemble_count++ ))
+    do
+        if [ $do_ens == "YES" ]; then
+            ens_member=${ens_list[$ensemble_count]}
+            ENSEMBLE_DIR=${WORKDIR}/ens${ens_member}
+            restart_anal_id=.ens${ens_member}_anal
+            restart_back_id=.ens${ens_member}_back
+        else
+            ENSEMBLE_DIR=${WORKDIR}
+            restart_anal_id='_anal'
+            restart_back_id='_back'
+        fi
+
+        cd ${ENSEMBLE_DIR}
+
+        if [ $do_jedi == "YES" ]; then
+            cp  ${CYCLEDIR}/template.tile2vector tile2vector.namelist
+
+            sed -i -e "s/XXYYYY/${YYYY}/g" tile2vector.namelist
+            sed -i -e "s/XXMM/${MM}/g" tile2vector.namelist
+            sed -i -e "s/XXDD/${DD}/g" tile2vector.namelist
+            sed -i -e "s/XXHH/${HH}/g" tile2vector.namelist
+
+            echo '************************************************'
+            echo 'calling tile2vector' 
+            $vec2tileexec tile2vector.namelist
+            if [[ $? != 0 ]]; then
+                echo "tile2vector failed"
+                exit 
+            fi
+
+            # save analysis restart
+            src_restart=${ENSEMBLE_DIR}/restarts/vector/ufs_land_restart.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
+            cp ${src_restart} ${SAVEDIR}/vector/ufs_land_restart${restart_anal_id}.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
+        fi
+
+        if [ $do_ens == "YES" ]; then
+            namelist_file=${CYCLEDIR}/template.ens.ufs-noahMP.namelist.gswp3
+        else
+            namelist_file=${CYCLEDIR}/template.ufs-noahMP.namelist.gdas
+        fi
         # update model namelist 
         cp  ${namelist_file}  ufs-land.namelist
 
@@ -236,62 +328,6 @@ while [ $date_count -lt $dates_per_job ]; do
             done
         fi
      
-        if [ $do_jedi == "YES" ]; then  # do DA
-
-            # update vec2tile and tile2vec namelists
-            cp  ${CYCLEDIR}/template.vector2tile vector2tile.namelist
-
-            sed -i -e "s/XXYYYY/${YYYY}/g" vector2tile.namelist
-            sed -i -e "s/XXMM/${MM}/g" vector2tile.namelist
-            sed -i -e "s/XXDD/${DD}/g" vector2tile.namelist
-            sed -i -e "s/XXHH/${HH}/g" vector2tile.namelist
-
-            cp  ${CYCLEDIR}/template.tile2vector tile2vector.namelist
-
-            sed -i -e "s/XXYYYY/${YYYY}/g" tile2vector.namelist
-            sed -i -e "s/XXMM/${MM}/g" tile2vector.namelist
-            sed -i -e "s/XXDD/${DD}/g" tile2vector.namelist
-            sed -i -e "s/XXHH/${HH}/g" tile2vector.namelist
-
-            # submit vec2tile 
-            echo '************************************************'
-            echo 'calling vector2tile' 
-            $vec2tileexec vector2tile.namelist
-            if [[ $? != 0 ]]; then
-                echo "vec2tile failed"
-                exit 
-            fi
-            # add coupler.res file
-            cres_file=${ENSEMBLE_DIR}/restarts/tile/${YYYY}${MM}${DD}.${HH}0000.coupler.res
-            cp  ${CYCLEDIR}/template.coupler.res $cres_file
-
-            sed -i -e "s/XXYYYY/${YYYY}/g" $cres_file
-            sed -i -e "s/XXMM/${MM}/g" $cres_file
-            sed -i -e "s/XXDD/${DD}/g" $cres_file
-
-            # submit snow DA 
-            echo '************************************************'
-            echo 'calling snow DA'
-            export THISDATE
-            $DAscript
-            if [[ $? != 0 ]]; then
-                echo "land DA script failed"
-                exit
-            fi  # submit tile2vec
-
-            echo '************************************************'
-            echo 'calling tile2vector' 
-            $vec2tileexec tile2vector.namelist
-            if [[ $? != 0 ]]; then
-                echo "tile2vector failed"
-                exit 
-            fi
-
-            # save analysis restart
-            src_restart=${ENSEMBLE_DIR}/restarts/vector/ufs_land_restart.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
-            cp ${src_restart} ${SAVEDIR}/vector/ufs_land_restart${restart_anal_id}.${YYYY}-${MM}-${DD}_${HH}-00-00.nc
-        fi # DA step
-
         # submit model
         echo '************************************************'
         if [ $do_ens == "YES" ]; then
