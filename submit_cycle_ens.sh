@@ -9,31 +9,81 @@
 #SBATCH -o log_noahmp.%j.log
 #SBATCH -e err_noahmp.%j.err
 
+##########
+# to do: 
+# -specify resolution in this script (currently fixed at 96) 
+# -decide how to manage soil moisture DA. Separate DA script to snow? 
+# -add ensemble options
+
 # experiment name 
-exp_name=open_testing
-open_loop=True # If "False" do DA.
+
+exp_name=DA_testing
+
+##################################################
+# specify DA options (all should be "YES" or "NO") 
+##################################################
+
+export do_DA=NO   # do full DA update
+do_hofx=YES  # use JEDI to calculate hofx, but do not do update 
+            # only used if do_DA=NO  
+
+# Zhichang - I'm assuming you'll add a do_ens option here.
+
+# DA options (select "YES" to assimilate or calcualte hofx) 
+DAtype="letkfoi_snow" # for snow, use "letkfoi_snow" 
+export ASSIM_IMS=YES
+export ASSIM_GHCN=YES
+export ASSIM_SYNTH=NO
+
+if [[ $do_DA == "YES" || $do_hofx == "YES" ]]; then  # do DA
+   do_jedi=YES
+   # construct yaml name
+   if [ $do_DA == "YES" ]; then 
+        JEDI_YAML=${DAtype}"_offline_DA"
+   elif [ $do_hofx == "YES" ]; then 
+        JEDI_YAML=${DAtype}"_offline_hofx"
+   fi 
+
+   if  [ ASSIM_IMS=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_IMS" ; fi 
+   if  [ ASSIM_GHCN=="YES" ]; then JEDI_YAML=${JEDI_YAML}"_GHCN" ; fi 
+
+   JEDI_YAML=${JEDI_YAML}"_C96.yaml" # IMS and GHCN
+   
+   echo "JEDI YAML is: "$JEDI_YAML
+
+   if [[ ! -e ./landDA_workflow/jedi/fv3-jedi/yaml_files/$JEDI_YAML ]]; then 
+        echo "YAML does not exist, exiting" 
+        exit 
+   fi 
+   export JEDI_YAML
+else
+   do_jedi=NO
+fi 
 
 # set your directories
 export WORKDIR=/scratch2/BMC/gsienkf/Clara.Draper/workdir/ # temporary work dir
 export OUTDIR=/scratch2/BMC/gsienkf/Clara.Draper/gerrit-hera/AZworkflow/${exp_name}/output/
 
-dates_per_job=20
+dates_per_job=2
 
 ######################################################
 # shouldn't need to change anything below here
 
 SAVEDIR=${OUTDIR}/restarts # dir to save restarts
 MODLDIR=${OUTDIR}/noahmp # dir to save noah-mp output
-# create output dircetories
-mkdir -p ${OUTDIR}/DA
-mkdir ${OUTDIR}/DA/IMSproc 
-mkdir ${OUTDIR}/DA/jedi_incr
-mkdir ${OUTDIR}/DA/logs
-mkdir ${OUTDIR}/DA/hofx
-mkdir ${OUTDIR}/restarts
-mkdir ${OUTDIR}/restarts/vector
-mkdir ${OUTDIR}/restarts/tile
-mkdir ${OUTDIR}/noahmp
+
+# create output directories if they do not already exist.
+if [[ ! -e ${OUTDIR} ]]; then
+    mkdir -p ${OUTDIR}/DA
+    mkdir ${OUTDIR}/DA/IMSproc 
+    mkdir ${OUTDIR}/DA/jedi_incr
+    mkdir ${OUTDIR}/DA/logs
+    mkdir ${OUTDIR}/DA/hofx
+    mkdir ${OUTDIR}/restarts
+    mkdir ${OUTDIR}/restarts/vector
+    mkdir ${OUTDIR}/restarts/tile
+    mkdir ${OUTDIR}/noahmp
+fi 
 
 source cycle_mods_bash
 
@@ -56,6 +106,19 @@ source ${analdate}
 
 echo "***************************************" >> $logfile
 echo "cycling from $STARTDATE to $ENDDATE" >> $logfile
+
+# If there is no restart in experiment directory, copy from current directory
+
+sYYYY=`echo $STARTDATE | cut -c1-4`
+sMM=`echo $STARTDATE | cut -c5-6`
+sDD=`echo $STARTDATE | cut -c7-8`
+sHH=`echo $STARTDATE | cut -c9-10`
+
+if [[ ! -e ${OUTDIR}/restarts/vector/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc ]]; then
+
+cp ./ufs_land_restart.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc ${OUTDIR}/restarts/vector/ufs_land_restart_back.${sYYYY}-${sMM}-${sDD}_${sHH}-00-00.nc
+
+fi
 
 THISDATE=$STARTDATE
 
@@ -102,7 +165,7 @@ while [ $date_count -lt $dates_per_job ]; do
     sed -i -e "s/XXDD/${DD}/g" ufs-land.namelist
     sed -i -e "s/XXHH/${HH}/g" ufs-land.namelist
      
-    if [ $open_loop == "False" ]; then  # do DA
+    if [ $do_jedi == "YES" ]; then  # do DA
 
         # update vec2tile and tile2vec namelists
         cp  ${CYCLEDIR}/template.vector2tile vector2tile.namelist
