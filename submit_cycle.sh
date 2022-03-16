@@ -17,19 +17,40 @@
 # -add ensemble options
 
 ############################
-# experiment name 
+# read in DA settings for the experiment
+File_setting=$1
+for line in $(cat ${File_setting})
+do
+    [[ -z "$line" ]] && continue
+    [[ $line =~ ^#.* ]] && continue
+    key=$(echo ${line} | cut -d'=' -f 1)
+    value=$(echo ${line} | cut -d'=' -f 2)
 
-exp_name=openloop_testing
+    case ${key} in
+
+        "exp_name")
+        exp_name=${value}
+        ;;
+
+        "ensemble_size")
+        ensemble_size=${value}
+        ;;
+
+        "atmos_forc")
+        atmos_forc=${value}
+        ;;
+
+        "dates_per_job")
+        dates_per_job=${value}
+        ;;
+    esac
+done
 
 ############################
 # model options
 
-export ensemble_size=1 # ensemble_size of 1 = do not run ensemble 
-                       # LETKF-OI pseudo ensemble uses 1
-
-atmos_forc='gdas' # options: gdas, gswp3, gefs_ens
-
-dates_per_job=2 # number of cycles to submit in a single job
+export ensemble_size # ensemble_size of 1 = do not run ensemble 
+                     # LETKF-OI pseudo ensemble uses 1
 
 ############################
 # DA options
