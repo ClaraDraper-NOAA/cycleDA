@@ -407,6 +407,6 @@ if [ $THISDATE -lt $ENDDATE ]; then
     echo "export STARTDATE=${THISDATE}" > ${analdate}
     echo "export ENDDATE=${ENDDATE}" >> ${analdate}
     cd ${CYCLEDIR}
-    sbatch ${CYCLEDIR}/submit_cycle.sh
+    sbatch ${CYCLEDIR}/submit_cycle.sh ${File_setting}
 fi
 
