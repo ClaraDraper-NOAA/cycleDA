@@ -126,7 +126,7 @@ export OUTDIR
 # load modules 
 source cycle_mods_bash
 
-# set executables
+# set default executables if undefined
 if [[ -z "$vec2tileexec" ]]; then
     vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
 fi
@@ -139,14 +139,14 @@ fi
 if [[ -z "$DADIR" ]]; then
     DADIR=${CYCLEDIR}/landDA_workflow/
 fi
-export DADIR
-
 if [[ -z "$analdate" ]]; then
     analdate=${CYCLEDIR}/analdates.sh
 fi
 if [[ -z "$incdate" ]]; then
     incdate=${CYCLEDIR}/incdate.sh
 fi
+
+export DADIR
 
 # create clean workdir
 if [[ -e ${WORKDIR} ]]; then 
@@ -363,7 +363,7 @@ while [ $date_count -lt $dates_per_job ]; do
         echo '************************************************'
         echo 'calling snow DA'
         export THISDATE
-        $DAscript
+        $DAscript ${File_setting}
         if [[ $? != 0 ]]; then
             echo "land DA script failed"
             exit
