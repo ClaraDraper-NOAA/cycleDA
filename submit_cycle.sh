@@ -16,81 +16,137 @@
 # -decide how to manage soil moisture DA. Separate DA script to snow? 
 # -add ensemble options
 
-############################
-# read in DA settings for the experiment
 File_setting=$1
-for line in $(cat ${File_setting})
+############################
+# read in CYCLEDIR and exp_name
+while read line
 do
     [[ -z "$line" ]] && continue
     [[ $line =~ ^#.* ]] && continue
     key=$(echo ${line} | cut -d'=' -f 1)
     value=$(echo ${line} | cut -d'=' -f 2)
-
     case ${key} in
-
+        "CYCLEDIR")
+        CYCLEDIR=${value}
+        ;;
         "exp_name")
         exp_name=${value}
         ;;
+    esac
+done < "$File_setting"
+if [[ -z "$CYCLEDIR" ]]; then
+    CYCLEDIR=$(pwd)  # this directory
+fi
 
+# read in DA settings for the experiment
+while read line
+do
+    [[ -z "$line" ]] && continue
+    [[ $line =~ ^#.* ]] && continue
+    key=$(echo ${line} | cut -d'=' -f 1)
+    value=$(echo ${line} | cut -d'=' -f 2)
+    if [[ "$value" == *"{CYCLEDIR}"* ]]; then
+        value=${value//'{CYCLEDIR}'/$CYCLEDIR}
+    fi
+    if [[ "$value" == *"{exp_name}"* ]]; then
+        value=${value//'{exp_name}'/$exp_name}
+    fi
+    case ${key} in
         "ensemble_size")
         ensemble_size=${value}
         ;;
-
         "atmos_forc")
         atmos_forc=${value}
         ;;
-
         "dates_per_job")
         dates_per_job=${value}
         ;;
+        "do_DA")
+        do_DA=${value}
+        ;;
+        "do_hofx")
+        do_hofx=${value}
+        ;;
+        "ASSIM_IMS")
+        ASSIM_IMS=${value}
+        ;;
+        "ASSIM_GHCN")
+        ASSIM_GHCN=${value}
+        ;;
+        "ASSIM_SYNTH")
+        ASSIM_SYNTH=${value}
+        ;;
+        "DAtype")
+        DAtype=${value}
+        ;;
+        "WORKDIR")
+        WORKDIR=${value}
+        ;;
+        "ICSDIR")
+        ICSDIR=${value}
+        ;;
+        "OUTDIR")
+        OUTDIR=${value}
+        ;;
+        "vec2tileexec")
+        vec2tileexec=${value}
+        ;;
+        "LSMexec")
+        LSMexec=${value}
+        ;;
+        "DAscript")
+        DAscript=${value}
+        ;;
+        "DADIR")
+        DADIR=${value}
+        ;;
+        "analdate")
+        analdate=${value}
+        ;;
+        "incdate")
+        incdate=${value}
+        ;;
+        #default case
+        #*)
+        #echo ${line}
+        #;;
     esac
-done
+done < "$File_setting"
 
 ############################
-# model options
-
-export ensemble_size # ensemble_size of 1 = do not run ensemble 
-                     # LETKF-OI pseudo ensemble uses 1
-
-############################
-# DA options
-
-# select YES or NO
-export do_DA=YES  # do full DA update
-do_hofx=NO  # use JEDI to calculate hofx, but do not do update 
-             # only used if do_DA=NO  
-export ASSIM_IMS=NO
-export ASSIM_GHCN=YES
-export ASSIM_SYNTH=NO
-
-DAtype="letkfoi_snow" # options: "letkfoi_snow" , "letkf_snow"
-
-############################
-# set your directories
-
-CYCLEDIR=$(pwd)  # this directory
-export WORKDIR=/scratch2/BMC/gsienkf/Clara.Draper/workdir/ # temporary work dir 
-export OUTDIR=${CYCLEDIR}/exp_out/${exp_name}/output/      # directory where output will be saved
-ICSDIR="/scratch2/BMC/gsienkf/Clara.Draper/DA_test_cases/offline_ICS/single/" # OUTDIR for experiment with initial conditions
-                                                           # will use ensemble of restarts if present, otherwise will try 
-                                                           # to copy a non-ensemble restart into each ensemble restart
+# set environment variables
+export ensemble_size
+export do_DA
+export ASSIM_IMS
+export ASSIM_GHCN
+export ASSIM_SYNTH
+export WORKDIR
+export OUTDIR
                                 
-#############################################################################################################################
-# shouldn't need to change anything below here
-
 # load modules 
-
 source cycle_mods_bash
 
 # set executables
+if [[ -z "$vec2tileexec" ]]; then
+    vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
+fi
+if [[ -z "$LSMexec" ]]; then
+    LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
+fi
+if [[ -z "$DAscript" ]]; then
+    DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
+fi
+if [[ -z "$DADIR" ]]; then
+    DADIR=${CYCLEDIR}/landDA_workflow/
+fi
+export DADIR
 
-vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
-LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
-DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
-export DADIR=${CYCLEDIR}/landDA_workflow/
-
-analdate=${CYCLEDIR}/analdates.sh
-incdate=${CYCLEDIR}/incdate.sh
+if [[ -z "$analdate" ]]; then
+    analdate=${CYCLEDIR}/analdates.sh
+fi
+if [[ -z "$incdate" ]]; then
+    incdate=${CYCLEDIR}/incdate.sh
+fi
 
 # create clean workdir
 if [[ -e ${WORKDIR} ]]; then 
@@ -119,7 +175,7 @@ if [[ $do_DA == "YES" || $do_hofx == "YES" ]]; then  # do DA
 
    echo "JEDI YAML is: "$JEDI_YAML
 
-   if [[ ! -e ./landDA_workflow/jedi/fv3-jedi/yaml_files/$JEDI_YAML ]]; then
+   if [[ ! -e ${DADIR}/jedi/fv3-jedi/yaml_files/$JEDI_YAML ]]; then
         echo "YAML does not exist, exiting" 
         exit
    fi
