@@ -70,11 +70,11 @@
  forcing_filename               = "C96_GEFS_forcing_"
  forcing_interp_solar           = "gswp3_zenith"  ! gswp3_zenith or linear
  forcing_time_solar             = "gswp3_average"  ! gswp3_average or instantaneous
- forcing_name_precipitation     = "precipitationXXMEM"
- forcing_name_temperature       = "temperatureXXMEM"
- forcing_name_specific_humidity = "specific_humidityXXMEM"
- forcing_name_wind_speed        = "wind_speedXXMEM"
- forcing_name_pressure          = "surface_pressureXXMEM"
- forcing_name_sw_radiation      = "solar_radiationXXMEM"
- forcing_name_lw_radiation      = "longwave_radiationXXMEM"
+ forcing_name_precipitation     = "precipitationXXXMEM"
+ forcing_name_temperature       = "temperatureXXXMEM"
+ forcing_name_specific_humidity = "specific_humidityXXXMEM"
+ forcing_name_wind_speed        = "wind_speedXXXMEM"
+ forcing_name_pressure          = "surface_pressureXXXMEM"
+ forcing_name_sw_radiation      = "solar_radiationXXXMEM"
+ forcing_name_lw_radiation      = "longwave_radiationXXXMEM"
 /
