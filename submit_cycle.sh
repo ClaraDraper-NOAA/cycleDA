@@ -29,6 +29,9 @@ do
         "CYCLEDIR")
         CYCLEDIR=${value}
         ;;
+        "EXPDIR")
+        EXPDIR=${value}
+        ;;
         "exp_name")
         exp_name=${value}
         ;;
@@ -36,6 +39,9 @@ do
 done < "$File_setting"
 if [[ -z "$CYCLEDIR" ]]; then
     CYCLEDIR=$(pwd)  # this directory
+fi
+if [[ -z "$EXPDIR" ]]; then
+    EXPDIR=$(pwd)  # this directory
 fi
 
 # read in DA settings for the experiment
@@ -45,11 +51,14 @@ do
     [[ $line =~ ^#.* ]] && continue
     key=$(echo ${line} | cut -d'=' -f 1)
     value=$(echo ${line} | cut -d'=' -f 2)
-    if [[ "$value" == *"{CYCLEDIR}"* ]]; then
-        value=${value//'{CYCLEDIR}'/$CYCLEDIR}
+    if [[ "$value" == *"$""{CYCLEDIR}"* ]]; then
+        value=${value//'$''{CYCLEDIR}'/$CYCLEDIR}
     fi
-    if [[ "$value" == *"{exp_name}"* ]]; then
-        value=${value//'{exp_name}'/$exp_name}
+    if [[ "$value" == *"$""{EXPDIR}"* ]]; then
+        value=${value//'$''{EXPDIR}'/$exp_name}
+    fi
+    if [[ "$value" == *"$""{exp_name}"* ]]; then
+        value=${value//'$''{exp_name}'/$exp_name}
     fi
     case ${key} in
         "ensemble_size")
@@ -82,29 +91,11 @@ do
         "WORKDIR")
         WORKDIR=${value}
         ;;
+        "DIFF_CYCLEDIR")
+        DIFF_CYCLEDIR=${value}
+        ;;
         "ICSDIR")
         ICSDIR=${value}
-        ;;
-        "OUTDIR")
-        OUTDIR=${value}
-        ;;
-        "vec2tileexec")
-        vec2tileexec=${value}
-        ;;
-        "LSMexec")
-        LSMexec=${value}
-        ;;
-        "DAscript")
-        DAscript=${value}
-        ;;
-        "DADIR")
-        DADIR=${value}
-        ;;
-        "analdate")
-        analdate=${value}
-        ;;
-        "incdate")
-        incdate=${value}
         ;;
         #default case
         #*)
@@ -121,32 +112,25 @@ export ASSIM_IMS
 export ASSIM_GHCN
 export ASSIM_SYNTH
 export WORKDIR
-export OUTDIR
+
+############################
+# set your directories
+export OUTDIR=${EXPDIR}/${exp_name}/output/
+if [[ ! -z "$DIFF_CYCLEDIR" ]]; then
+    CYCLEDIR=${DIFF_CYCLEDIR}  # overwrite if DIFF_CYCLEDIR is set
+fi
                                 
 # load modules 
 source cycle_mods_bash
 
-# set default executables if undefined
-if [[ -z "$vec2tileexec" ]]; then
-    vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
-fi
-if [[ -z "$LSMexec" ]]; then
-    LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
-fi
-if [[ -z "$DAscript" ]]; then
-    DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
-fi
-if [[ -z "$DADIR" ]]; then
-    DADIR=${CYCLEDIR}/landDA_workflow/
-fi
-if [[ -z "$analdate" ]]; then
-    analdate=${CYCLEDIR}/analdates.sh
-fi
-if [[ -z "$incdate" ]]; then
-    incdate=${CYCLEDIR}/incdate.sh
-fi
+# set executables
+vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
+LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
+DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
+export DADIR=${CYCLEDIR}/landDA_workflow/
 
-export DADIR
+analdate=${CYCLEDIR}/analdates.sh
+incdate=${CYCLEDIR}/incdate.sh
 
 # create clean workdir
 if [[ -e ${WORKDIR} ]]; then 
