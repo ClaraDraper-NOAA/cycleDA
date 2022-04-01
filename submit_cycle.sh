@@ -16,52 +16,18 @@
 # -decide how to manage soil moisture DA. Separate DA script to snow? 
 # -add ensemble options
 
-File_setting=$1
 ############################
-# read in DA settings for the experiment
-while read line
-do
-    [[ -z "$line" ]] && continue
-    [[ $line =~ ^#.* ]] && continue
-    key=$(echo ${line} | cut -d'=' -f 1)
-    value=$(echo ${line} | cut -d'=' -f 2)
-    case ${key} in
-        "CYCLEDIR")
-        CYCLEDIR=${value}
-        ;;
-        "EXPDIR")
-        EXPDIR=${value}
-        ;;
-        "exp_name")
-        exp_name=${value}
-        ;;
-        "ensemble_size")
-        ensemble_size=${value}
-        ;;
-        "atmos_forc")
-        atmos_forc=${value}
-        ;;
-        "dates_per_job")
-        dates_per_job=${value}
-        ;;
-        "do_DA")
-        do_DA=${value}
-        ;;
-        "WORKDIR")
-        WORKDIR=${value}
-        ;;
-        "DIFF_CYCLEDIR")
-        DIFF_CYCLEDIR=${value}
-        ;;
-        "ICSDIR")
-        ICSDIR=${value}
-        ;;
-        #default case
-        #*)
-        #echo ${line}
-        #;;
-    esac
-done < "$File_setting"
+# current directory
+CURDIR=$(pwd)
+
+############################
+# set up environment variables
+if [[ $# -gt 0 ]]; then 
+    config_file=${CURDIR}/$1
+else
+    config_file=./config.sh
+fi
+source ${config_file} 
 
 ############################
 # set your directories
@@ -74,7 +40,10 @@ fi
 if [[ -z "$EXPDIR" ]]; then
     EXPDIR=$(pwd)  # this directory
 fi
-OUTDIR=${EXPDIR}/${exp_name}/output/
+export OUTDIR=${EXPDIR}/${exp_name}/output/ # directory where output will be saved
+
+#############################################################################################################################
+# shouldn't need to change anything below here
 
 # load modules 
 
@@ -85,6 +54,7 @@ OUTDIR=${EXPDIR}/${exp_name}/output/
 vec2tileexec=${CYCLEDIR}/vector2tile/vector2tile_converter.exe
 LSMexec=${CYCLEDIR}/ufs_land_driver/ufsLand.exe 
 DAscript=${CYCLEDIR}/landDA_workflow/do_snowDA.sh 
+export DADIR=${CYCLEDIR}/landDA_workflow/
 
 analdate=${CYCLEDIR}/analdates.sh
 incdate=${CYCLEDIR}/incdate.sh
@@ -96,8 +66,32 @@ fi
 
 mkdir ${WORKDIR}
 
-if [[ $do_DA == "hofx" || $do_DA == "LETKF-OI" || $do_DA == "LETKF" ]]; then  # do DA
+############################
+# create the jedi yaml name 
+
+if [[ ! $do_DA == "NO" ]]; then  # do DA
    do_jedi=YES
+   # construct yaml name
+   if [ $do_DA == "hofx" ]; then
+        JEDI_YAML=${DAtype}"_offline_hofx"
+   else
+        JEDI_YAML=${DAtype}"_offline_DA"
+   fi
+
+   if [ $ASSIM_IMS == "YES" ]; then JEDI_YAML=${JEDI_YAML}"_IMS" ; fi
+   if [ $ASSIM_GHCN == "YES" ]; then JEDI_YAML=${JEDI_YAML}"_GHCN" ; fi
+   if [ $ASSIM_SYNTH == "YES" ]; then JEDI_YAML=${JEDI_YAML}"_SYNTH"; fi
+
+   JEDI_YAML=${JEDI_YAML}"_C96.yaml" # IMS and GHCN
+
+   echo "JEDI YAML is: "$JEDI_YAML
+
+   if [[ ! -e ${DADIR}/jedi/fv3-jedi/yaml_files/$JEDI_YAML ]]; then
+        echo ${DADIR}/jedi/fv3-jedi/yaml_files/$JEDI_YAML
+        echo "YAML does not exist, exiting" 
+        exit
+   fi
+   export JEDI_YAML
 else
    do_jedi=NO
 fi
@@ -281,7 +275,7 @@ while [ $date_count -lt $dates_per_job ]; do
         echo '************************************************'
         echo 'calling snow DA'
         export THISDATE
-        $DAscript ${CYCLEDIR}/${File_setting}
+        $DAscript
         if [[ $? != 0 ]]; then
             echo "land DA script failed"
             exit
@@ -357,11 +351,12 @@ while [ $date_count -lt $dates_per_job ]; do
     #        exit 
     #    fi
 
+
         source_restart=${MEM_WORKDIR}/restarts/vector/ufs_land_restart.${nYYYY}-${nMM}-${nDD}_${nHH}-00-00.nc
         target_restart=${MEM_OUTDIR}/restarts/vector/ufs_land_restart_back.${nYYYY}-${nMM}-${nDD}_${nHH}-00-00.nc
-        if [[ -e ${source_restart} ]]; then 
+        if [[ -e ${source_restart} ]]; then
            cp ${source_restart} ${target_restart}
-        else 
+        else
            echo "Something is wrong, probably the model, exiting" 
            exit
         fi
@@ -385,6 +380,6 @@ if [ $THISDATE -lt $ENDDATE ]; then
     echo "export STARTDATE=${THISDATE}" > ${analdate}
     echo "export ENDDATE=${ENDDATE}" >> ${analdate}
     cd ${CYCLEDIR}
-    sbatch ${CYCLEDIR}/submit_cycle.sh ${File_setting}
+    sbatch ${CYCLEDIR}/submit_cycle.sh
 fi
 
